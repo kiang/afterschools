@@ -52,8 +52,8 @@ var content = document.getElementById('infoBox');
 var slipBox = document.getElementById('slipBox');
 
 var appView = new ol.View({
-  center: ol.proj.fromLonLat([120.221507, 23.000694]),
-  zoom: 14
+  center: ol.proj.fromLonLat([120.721507, 23.700694]),
+  zoom: 9
 });
 
 var pointFormat = new ol.format.GeoJSON({
