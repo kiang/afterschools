@@ -173,6 +173,65 @@ var rawMap = {
   '臺東市': '台東市',
 };
 
+// Add search functionality
+function setupSearch() {
+  // Create an array to store all feature names and codes
+  let searchData = [];
+  
+  // Function to update search data when features change
+  function updateSearchData() {
+    searchData = [];
+    const features = vectorPoints.getSource().getFeatures();
+    features.forEach(function(feature) {
+      const props = feature.getProperties();
+      if (props.name && props.code) {
+        searchData.push({
+          label: props.name,  // Display in autocomplete dropdown
+          value: props.name,  // Value to fill in input
+          code: props.code,
+          county: props.county
+        });
+      }
+    });
+  }
+
+  // Initialize autocomplete on the search input
+  $('#feature-search').autocomplete({
+    minLength: 1,
+    position: { 
+      my: "left top+2",
+      at: "left bottom"
+    },
+    source: function(request, response) {
+      const term = request.term.toLowerCase();
+      const matches = searchData.filter(function(item) {
+        return item.label.toLowerCase().indexOf(term) !== -1;
+      });
+      response(matches);
+    },
+    select: function(event, ui) {
+      // When user selects an item, navigate to that feature
+      if (ui.item.county && ui.item.code) {
+        routie(ui.item.county + '/' + ui.item.code);
+      }
+    }
+  }).autocomplete('instance')._renderItem = function(ul, item) {
+    // Custom rendering of autocomplete items
+    $(ul).addClass('autocomplete-above-sidebar'); // Add custom class for z-index
+    return $('<li>')
+      .append('<div>' + item.label + '</div>')
+      .appendTo(ul);
+  };
+
+  // Update search data when features change
+  vectorPoints.getSource().on('change', function() {
+    updateSearchData();
+  });
+}
+
+// Initialize search after map is ready
+map.once('postrender', setupSearch);
+
 // Add function to handle feature display
 function showFeatureDetails(feature) {
   if (!feature) return;
@@ -183,6 +242,15 @@ function showFeatureDetails(feature) {
   if (rawMap[selectedCounty]) {
     targetCounty = rawMap[selectedCounty];
   }
+  
+  // Zoom and center on the feature
+  const geometry = feature.getGeometry();
+  const coordinates = geometry.getCoordinates();
+  map.getView().animate({
+    center: coordinates,
+    zoom: 15,
+    duration: 1000
+  });
   
   $.getJSON('https://kiang.github.io/bsb.kh.edu.tw/data/raw/' + targetCounty + '/' + p.code + '.json', function (c) {
     vectorPoints.getSource().refresh();
