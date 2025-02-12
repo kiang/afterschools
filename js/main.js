@@ -142,6 +142,112 @@ var rawMap = {
   '臺南市': '台南市',
   '臺東市': '台東市',
 };
+
+// Add function to handle feature display
+function showFeatureDetails(feature) {
+  if (!feature) return;
+  
+  currentFeature = feature;
+  var p = feature.getProperties();
+  var targetCounty = selectedCounty;
+  if (rawMap[selectedCounty]) {
+    targetCounty = rawMap[selectedCounty];
+  }
+  
+  $.getJSON('https://kiang.github.io/bsb.kh.edu.tw/data/raw/' + targetCounty + '/' + p.code + '.json', function (c) {
+    vectorPoints.getSource().refresh();
+    var lonLat = ol.proj.toLonLat(p.geometry.getCoordinates());
+    var message = '<table class="table table-dark">';
+    message += '<tbody>';
+    message += '<tr><th scope="row" style="width: 100px;">名稱</th><td>' + c.補習班名稱 + '</td></tr>';
+    message += '<tr><th scope="row">電話</th><td>' + c.電話 + '</td></tr>';
+    message += '<tr><th scope="row">住址</th><td>' + c.地址 + '</td></tr>';
+    message += '<tr><td colspan="2">';
+    message += '<hr /><div class="btn-group-vertical" role="group" style="width: 100%;">';
+    message += '<a href="https://www.google.com/maps/dir/?api=1&destination=' + lonLat[1] + ',' + lonLat[0] + '&travelmode=driving" target="_blank" class="btn btn-info btn-lg btn-block">Google 導航</a>';
+    message += '<a href="https://wego.here.com/directions/drive/mylocation/' + lonLat[1] + ',' + lonLat[0] + '" target="_blank" class="btn btn-info btn-lg btn-block">Here WeGo 導航</a>';
+    message += '<a href="https://bing.com/maps/default.aspx?rtp=~pos.' + lonLat[1] + '_' + lonLat[0] + '" target="_blank" class="btn btn-info btn-lg btn-block">Bing 導航</a>';
+    message += '</div></td></tr>';
+    message += '<tr><th scope="row">班主任</th><td>';
+    for(k in c["班主任"]) {
+      message += c["班主任"][k] + ',';
+    }
+    message += '</td></tr>';
+    message += '<tr><th scope="row">職員工</th><td>';
+    for(k in c["職員工"]) {
+      message += c["職員工"][k] + ',';
+    }
+    message += '</td></tr>';
+    message += '<tr><th scope="row">負責人</th><td>';
+    for(k in c["負責人"]) {
+      message += c["負責人"][k] + ',';
+    }
+    message += '</td></tr>';
+    message += '<tr><th scope="row">設立人</th><td>';
+    for(k in c["設立人"]) {
+      message += c["設立人"][k] + ',';
+    }
+    message += '</td></tr>';
+    message += '<tr><th scope="row">傳真號碼</th><td>' + c.傳真號碼 + '</td></tr>';
+    message += '<tr><th scope="row">教室數</th><td>' + c.教室數 + '</td></tr>';
+    message += '<tr><th scope="row">教室面積</th><td>' + c.教室面積 + '</td></tr>';
+    message += '<tr><th scope="row">班舍總面積</th><td>' + c.班舍總面積 + '</td></tr>';
+    message += '<tr><th scope="row">立案情形</th><td>' + c.立案情形 + '</td></tr>';
+    message += '<tr><th scope="row">立案日期</th><td>' + c.立案日期 + '</td></tr>';
+    message += '<tr><th scope="row">補習班英文名稱</th><td>' + c.補習班英文名稱 + '</td></tr>';
+    message += '<tr><th scope="row">英文地址</th><td>' + c.英文地址 + '</td></tr>';
+    message += '<tr><th scope="row">補習班類別/科目</th><td>' + c["補習班類別/科目"] + '</td></tr>';
+    message += '</tbody></table>';
+    sidebarTitle.innerHTML = p.name;
+    content.innerHTML = message;
+    sidebar.open('home');
+    message = '';
+    for(k in c.核准科目) {
+      message += '<table class="table table-dark"><tbody>';
+      for(l in c.核准科目[k]) {
+        message += '<tr><th scope="row">' + l + '</th><td>' + c.核准科目[k][l] + '</td></tr>';
+      }
+      message += '</tbody></table>';
+    }
+    slipBox.innerHTML = message;
+  });
+}
+
+// Add routing handlers
+routie({
+  '': function() {
+    // Handle default route - clear selection
+    currentFeature = false;
+    vectorPoints.getSource().refresh();
+    sidebar.close();
+  },
+  ':countyName/:code': function(countyName, code) {
+    // Handle feature route
+    selectedCounty = countyName;
+    if (!pointsPool[selectedCounty]) {
+      $.getJSON('https://kiang.github.io/bsb.kh.edu.tw/data/map/' + selectedCounty + '.json', function (c) {
+        pointsPool[selectedCounty] = true;
+        vectorPoints.getSource().addFeatures(pointFormat.readFeatures(c));
+        vectorPoints.getSource().refresh();
+        
+        // Find and show feature with matching code
+        var features = vectorPoints.getSource().getFeatures();
+        var targetFeature = features.find(f => f.get('code') === code);
+        if (targetFeature) {
+          showFeatureDetails(targetFeature);
+        }
+      });
+    } else {
+      var features = vectorPoints.getSource().getFeatures();
+      var targetFeature = features.find(f => f.get('code') === code);
+      if (targetFeature) {
+        showFeatureDetails(targetFeature);
+      }
+    }
+    county.getSource().refresh();
+  }
+});
+
 map.on('singleclick', function (evt) {
   content.innerHTML = '';
   pointClicked = false;
@@ -161,69 +267,11 @@ map.on('singleclick', function (evt) {
           vectorPoints.getSource().refresh();
         }
         county.getSource().refresh();
+        // Update URL when selecting county
+        routie('');
       } else {
-        currentFeature = feature;
-        var targetCounty = selectedCounty;
-        if (rawMap[selectedCounty]) {
-          targetCounty = rawMap[selectedCounty];
-        }
-        $.getJSON('https://kiang.github.io/bsb.kh.edu.tw/data/raw/' + targetCounty + '/' + p.code + '.json', function (c) {
-          vectorPoints.getSource().refresh();
-          var lonLat = ol.proj.toLonLat(p.geometry.getCoordinates());
-          var message = '<table class="table table-dark">';
-          message += '<tbody>';
-          message += '<tr><th scope="row" style="width: 100px;">名稱</th><td>' + c.補習班名稱 + '</td></tr>';
-          message += '<tr><th scope="row">電話</th><td>' + c.電話 + '</td></tr>';
-          message += '<tr><th scope="row">住址</th><td>' + c.地址 + '</td></tr>';
-          message += '<tr><td colspan="2">';
-          message += '<hr /><div class="btn-group-vertical" role="group" style="width: 100%;">';
-          message += '<a href="https://www.google.com/maps/dir/?api=1&destination=' + lonLat[1] + ',' + lonLat[0] + '&travelmode=driving" target="_blank" class="btn btn-info btn-lg btn-block">Google 導航</a>';
-          message += '<a href="https://wego.here.com/directions/drive/mylocation/' + lonLat[1] + ',' + lonLat[0] + '" target="_blank" class="btn btn-info btn-lg btn-block">Here WeGo 導航</a>';
-          message += '<a href="https://bing.com/maps/default.aspx?rtp=~pos.' + lonLat[1] + '_' + lonLat[0] + '" target="_blank" class="btn btn-info btn-lg btn-block">Bing 導航</a>';
-          message += '</div></td></tr>';
-          message += '<tr><th scope="row">班主任</th><td>';
-          for(k in c["班主任"]) {
-            message += c["班主任"][k] + ',';
-          }
-          message += '</td></tr>';
-          message += '<tr><th scope="row">職員工</th><td>';
-          for(k in c["職員工"]) {
-            message += c["職員工"][k] + ',';
-          }
-          message += '</td></tr>';
-          message += '<tr><th scope="row">負責人</th><td>';
-          for(k in c["負責人"]) {
-            message += c["負責人"][k] + ',';
-          }
-          message += '</td></tr>';
-          message += '<tr><th scope="row">設立人</th><td>';
-          for(k in c["設立人"]) {
-            message += c["設立人"][k] + ',';
-          }
-          message += '</td></tr>';
-          message += '<tr><th scope="row">傳真號碼</th><td>' + c.傳真號碼 + '</td></tr>';
-          message += '<tr><th scope="row">教室數</th><td>' + c.教室數 + '</td></tr>';
-          message += '<tr><th scope="row">教室面積</th><td>' + c.教室面積 + '</td></tr>';
-          message += '<tr><th scope="row">班舍總面積</th><td>' + c.班舍總面積 + '</td></tr>';
-          message += '<tr><th scope="row">立案情形</th><td>' + c.立案情形 + '</td></tr>';
-          message += '<tr><th scope="row">立案日期</th><td>' + c.立案日期 + '</td></tr>';
-          message += '<tr><th scope="row">補習班英文名稱</th><td>' + c.補習班英文名稱 + '</td></tr>';
-          message += '<tr><th scope="row">英文地址</th><td>' + c.英文地址 + '</td></tr>';
-          message += '<tr><th scope="row">補習班類別/科目</th><td>' + c["補習班類別/科目"] + '</td></tr>';
-          message += '</tbody></table>';
-          sidebarTitle.innerHTML = p.name;
-          content.innerHTML = message;
-          sidebar.open('home');
-          message = '';
-          for(k in c.核准科目) {
-            message += '<table class="table table-dark"><tbody>';
-            for(l in c.核准科目[k]) {
-              message += '<tr><th scope="row">' + l + '</th><td>' + c.核准科目[k][l] + '</td></tr>';
-            }
-            message += '</tbody></table>';
-          }
-          slipBox.innerHTML = message;
-        });
+        // Update URL when selecting a feature
+        routie(selectedCounty + '/' + p.code);
       }
     }
   });
