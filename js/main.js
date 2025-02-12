@@ -16,36 +16,66 @@ var cityList = {};
 var filterCity = '', filterTown = '';
 var filterExtent = false;
 function pointStyle(f) {
-  var p = f.getProperties(), color = '#03c', stroke, radius;
+  var p = f.getProperties();
   if (selectedCounty !== p.county) {
     return null;
   }
+
+  // Base style properties
+  let color, stroke, radius, rotation = 0;
+  
   if (f === currentFeature) {
-    color = '#3c0';
+    // Selected feature style
+    color = '#FF9800';  // Warm orange
     stroke = new ol.style.Stroke({
-      color: '#000',
-      width: 5
+      color: '#FFF',
+      width: 3
     });
-    radius = 25;
+    radius = 22;
   } else {
+    // Default feature style
+    color = '#4CAF50';  // Pleasant green
     stroke = new ol.style.Stroke({
-      color: '#fff',
+      color: '#FFF',
       width: 2
     });
-    radius = 20;
+    radius = 18;
   }
 
-  let pointStyle = new ol.style.Style({
+  // Create star shape for school markers
+  let style = {
     image: new ol.style.RegularShape({
+      points: 5,  // Five points makes a star
       radius: radius,
-      points: 3,
+      radius2: radius * 0.5,  // Inner radius for star shape
       fill: new ol.style.Fill({
         color: color
       }),
-      stroke: stroke
+      stroke: stroke,
+      rotation: Math.PI / 2,  // Rotate to point up
+      displacement: [0, 0]
     })
-  });
-  return pointStyle;
+  };
+
+  // Add text label only if zoom level is greater than 15
+  const currentZoom = map.getView().getZoom();
+  if (currentZoom >= 15) {
+    style.text = new ol.style.Text({
+      text: p.name,
+      offsetY: radius + 15,
+      font: '14px "Open Sans", "Arial Unicode MS", "sans-serif"',
+      fill: new ol.style.Fill({
+        color: '#333'
+      }),
+      stroke: new ol.style.Stroke({
+        color: '#fff',
+        width: 3
+      }),
+      textAlign: 'center'
+    });
+  }
+
+  return new ol.style.Style(style);
 }
 var sidebarTitle = document.getElementById('sidebarTitle');
 var content = document.getElementById('infoBox');
@@ -270,11 +300,28 @@ map.on('singleclick', function (evt) {
         // Update URL when selecting county
         routie('');
       } else {
-        // Update URL when selecting a feature
-        routie(selectedCounty + '/' + p.code);
+        // Check if clicking the same feature
+        if (currentFeature === feature) {
+          // Deselect current feature
+          currentFeature = false;
+          vectorPoints.getSource().refresh();
+          sidebar.close();
+          routie('');
+        } else {
+          // Select new feature
+          routie(selectedCounty + '/' + p.code);
+        }
       }
     }
   });
+  
+  // Handle clicking empty space
+  if (!pointClicked) {
+    currentFeature = false;
+    vectorPoints.getSource().refresh();
+    sidebar.close();
+    routie('');
+  }
 });
 
 var previousFeature = false;
@@ -335,4 +382,9 @@ $('#btn-geolocation').click(function () {
     alert('目前使用的設備無法提供地理資訊');
   }
   return false;
+});
+
+// Add after map initialization
+map.getView().on('change:resolution', function() {
+  vectorPoints.getSource().refresh();
 });
