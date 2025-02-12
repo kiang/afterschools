@@ -90,11 +90,49 @@ var pointFormat = new ol.format.GeoJSON({
   featureProjection: appView.getProjection()
 });
 
-var vectorPoints = new ol.layer.Vector({
+var clusterSource = new ol.source.Cluster({
+  distance: 40,
   source: new ol.source.Vector({
     format: pointFormat
-  }),
-  style: pointStyle
+  })
+});
+
+function clusterStyle(feature) {
+  var size = feature.get('features').length;
+  var style;
+  
+  if (size === 1) {
+    // Single feature - use original point style
+    return pointStyle(feature.get('features')[0]);
+  }
+
+  // Cluster style
+  style = new ol.style.Style({
+    image: new ol.style.Circle({
+      radius: 20,
+      fill: new ol.style.Fill({
+        color: '#4CAF50'
+      }),
+      stroke: new ol.style.Stroke({
+        color: '#fff',
+        width: 2
+      })
+    }),
+    text: new ol.style.Text({
+      text: size.toString(),
+      fill: new ol.style.Fill({
+        color: '#fff'
+      }),
+      font: 'bold 14px Arial'
+    })
+  });
+
+  return style;
+}
+
+var vectorPoints = new ol.layer.Vector({
+  source: clusterSource,
+  style: clusterStyle
 });
 
 var baseLayer = new ol.layer.Tile({
@@ -155,11 +193,21 @@ var county = new ol.layer.Vector({
   zIndex: 50
 });
 
-
 var map = new ol.Map({
   layers: [baseLayer, county, vectorPoints],
   target: 'map',
   view: appView
+});
+
+// Add optimization for canvas operations
+map.once('prerender', function() {
+  const canvas = map.getTargetElement().querySelector('canvas');
+  if (canvas) {
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    canvas.getContext = function() {
+      return context;
+    };
+  }
 });
 
 map.addControl(sidebar);
@@ -173,6 +221,46 @@ var rawMap = {
   '臺東市': '台東市',
 };
 
+// Add spider effect for clusters
+var spiderFeatures = [];
+var spiderLayer = new ol.layer.Vector({
+  source: new ol.source.Vector(),
+  style: new ol.style.Style({
+    stroke: new ol.style.Stroke({
+      color: '#666',
+      width: 1
+    })
+  }),
+  zIndex: 100
+});
+
+map.addLayer(spiderLayer);
+
+function createSpiderFeature(center, feature, index, count) {
+  var angle = (2 * Math.PI * index) / count;
+  var radius = 40; // Base radius
+  var x = center[0] + (radius * Math.cos(angle));
+  var y = center[1] + (radius * Math.sin(angle));
+  
+  // Create line from center to point
+  var line = new ol.Feature({
+    geometry: new ol.geom.LineString([center, [x, y]])
+  });
+  
+  // Create point feature
+  var point = new ol.Feature({
+    geometry: new ol.geom.Point([x, y]),
+    originalFeature: feature
+  });
+  
+  return [line, point];
+}
+
+function clearSpider() {
+  spiderLayer.getSource().clear();
+  spiderFeatures = [];
+}
+
 // Add search functionality
 function setupSearch() {
   // Create an array to store all feature names and codes
@@ -181,7 +269,7 @@ function setupSearch() {
   // Function to update search data when features change
   function updateSearchData() {
     searchData = [];
-    const features = vectorPoints.getSource().getFeatures();
+    const features = clusterSource.getSource().getFeatures();
     features.forEach(function(feature) {
       const props = feature.getProperties();
       if (props.name && props.code) {
@@ -224,7 +312,7 @@ function setupSearch() {
   };
 
   // Update search data when features change
-  vectorPoints.getSource().on('change', function() {
+  clusterSource.getSource().on('change', function() {
     updateSearchData();
   });
 }
@@ -236,6 +324,7 @@ map.once('postrender', setupSearch);
 function showFeatureDetails(feature) {
   if (!feature) return;
   
+  clearSpider();
   currentFeature = feature;
   var p = feature.getProperties();
   var targetCounty = selectedCounty;
@@ -248,12 +337,11 @@ function showFeatureDetails(feature) {
   const coordinates = geometry.getCoordinates();
   map.getView().animate({
     center: coordinates,
-    zoom: 15,
     duration: 1000
   });
   
   $.getJSON('https://kiang.github.io/bsb.kh.edu.tw/data/raw/' + targetCounty + '/' + p.code + '.json', function (c) {
-    vectorPoints.getSource().refresh();
+    clusterSource.getSource().refresh();
     var lonLat = ol.proj.toLonLat(p.geometry.getCoordinates());
     var message = '<table class="table table-dark">';
     message += '<tbody>';
@@ -316,7 +404,7 @@ routie({
   '': function() {
     // Handle default route - clear selection
     currentFeature = false;
-    vectorPoints.getSource().refresh();
+    clusterSource.getSource().refresh();
     sidebar.close();
   },
   ':countyName/:code': function(countyName, code) {
@@ -325,18 +413,18 @@ routie({
     if (!pointsPool[selectedCounty]) {
       $.getJSON('https://kiang.github.io/bsb.kh.edu.tw/data/map/' + selectedCounty + '.json', function (c) {
         pointsPool[selectedCounty] = true;
-        vectorPoints.getSource().addFeatures(pointFormat.readFeatures(c));
-        vectorPoints.getSource().refresh();
+        clusterSource.getSource().addFeatures(pointFormat.readFeatures(c));
+        clusterSource.refresh();
         
         // Find and show feature with matching code
-        var features = vectorPoints.getSource().getFeatures();
+        var features = clusterSource.getSource().getFeatures();
         var targetFeature = features.find(f => f.get('code') === code);
         if (targetFeature) {
           showFeatureDetails(targetFeature);
         }
       });
     } else {
-      var features = vectorPoints.getSource().getFeatures();
+      var features = clusterSource.getSource().getFeatures();
       var targetFeature = features.find(f => f.get('code') === code);
       if (targetFeature) {
         showFeatureDetails(targetFeature);
@@ -349,44 +437,83 @@ routie({
 map.on('singleclick', function (evt) {
   content.innerHTML = '';
   pointClicked = false;
-  map.forEachFeatureAtPixel(evt.pixel, function (feature, layer) {
+  
+  map.forEachFeatureAtPixel(evt.pixel, function(feature, layer) {
     if (false === pointClicked) {
       pointClicked = true;
-      var p = feature.getProperties();
-      if (p.COUNTYNAME) {
-        selectedCounty = p.COUNTYNAME;
-        if (!pointsPool[selectedCounty]) {
-          $.getJSON('https://kiang.github.io/bsb.kh.edu.tw/data/map/' + selectedCounty + '.json', function (c) {
-            pointsPool[selectedCounty] = true;
-            vectorPoints.getSource().addFeatures(pointFormat.readFeatures(c));
-            vectorPoints.getSource().refresh();
-          });
-        } else {
-          vectorPoints.getSource().refresh();
+      
+      if (layer === spiderLayer) {
+        // Clicked on spider point
+        var originalFeature = feature.get('originalFeature');
+        if (originalFeature) {
+          var p = originalFeature.getProperties();
+          if (p.code) {
+            routie(selectedCounty + '/' + p.code);
+          }
         }
-        county.getSource().refresh();
-        // Update URL when selecting county
-        routie('');
-      } else {
-        // Check if clicking the same feature
-        if (currentFeature === feature) {
-          // Deselect current feature
-          currentFeature = false;
-          vectorPoints.getSource().refresh();
-          sidebar.close();
+        return;
+      }
+      
+      if (layer === county) {
+        // Clicked on county shape
+        var p = feature.getProperties();
+        if (p.COUNTYNAME) {
+          selectedCounty = p.COUNTYNAME;
+          if (!pointsPool[selectedCounty]) {
+            $.getJSON('https://kiang.github.io/bsb.kh.edu.tw/data/map/' + selectedCounty + '.json', function(c) {
+              pointsPool[selectedCounty] = true;
+              clusterSource.getSource().addFeatures(pointFormat.readFeatures(c));
+              clusterSource.refresh();
+            });
+          } else {
+            clusterSource.refresh();
+          }
+          county.getSource().refresh();
+          clearSpider();
           routie('');
+          return;
+        }
+      }
+      
+      var features = feature.get('features');
+      if (features) {
+        if (features.length === 1) {
+          // Single feature
+          var p = features[0].getProperties();
+          if (p.code) {
+            routie(selectedCounty + '/' + p.code);
+          }
         } else {
-          // Select new feature
-          routie(selectedCounty + '/' + p.code);
+          // Cluster of features
+          clearSpider();
+          sidebar.close();
+          
+          // Get cluster center and current zoom
+          var center = feature.getGeometry().getCoordinates();
+          var currentZoom = map.getView().getZoom();
+          
+          // Animate to cluster center and zoom in one level
+          map.getView().animate({
+            center: center,
+            zoom: currentZoom + 1,
+            duration: 500
+          });
+          
+          // Create spider effect
+          features.forEach((f, i) => {
+            var spiderFeats = createSpiderFeature(center, f, i, features.length);
+            spiderFeatures.push(...spiderFeats);
+          });
+          spiderLayer.getSource().addFeatures(spiderFeatures);
         }
       }
     }
   });
   
-  // Handle clicking empty space
   if (!pointClicked) {
+    clearSpider();
     currentFeature = false;
-    vectorPoints.getSource().refresh();
+    clusterSource.getSource().refresh();
     sidebar.close();
     routie('');
   }
@@ -452,7 +579,8 @@ $('#btn-geolocation').click(function () {
   return false;
 });
 
-// Add after map initialization
+// Clear spider when zooming
 map.getView().on('change:resolution', function() {
-  vectorPoints.getSource().refresh();
+  clearSpider();
+  clusterSource.getSource().refresh();
 });
