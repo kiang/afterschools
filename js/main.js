@@ -155,6 +155,9 @@ var baseLayer = new ol.layer.Tile({
 
 function countyStyle(f) {
   var p = f.getProperties();
+  if(rawMap[p.COUNTYNAME]) {
+    p.COUNTYNAME = rawMap[p.COUNTYNAME];
+  }
   if (selectedCounty === p.COUNTYNAME) {
     return null;
   }
@@ -410,6 +413,9 @@ routie({
   ':countyName/:code': function(countyName, code) {
     // Handle feature route
     selectedCounty = countyName;
+    if(rawMap[selectedCounty]) {
+      selectedCounty = rawMap[selectedCounty];
+    }
     if (!pointsPool[selectedCounty]) {
       $.getJSON('https://kiang.github.io/bsb.kh.edu.tw/data/map/' + selectedCounty + '.json', function (c) {
         pointsPool[selectedCounty] = true;
@@ -459,6 +465,9 @@ map.on('singleclick', function (evt) {
         var p = feature.getProperties();
         if (p.COUNTYNAME) {
           selectedCounty = p.COUNTYNAME;
+          if(rawMap[selectedCounty]) {
+            selectedCounty = rawMap[selectedCounty];
+          }
           if (!pointsPool[selectedCounty]) {
             $.getJSON('https://kiang.github.io/bsb.kh.edu.tw/data/map/' + selectedCounty + '.json', function(c) {
               pointsPool[selectedCounty] = true;
