@@ -400,17 +400,10 @@ function showFeatureDetails(feature) {
     }
     slipBox.innerHTML = message;
     
-    // Remove any existing details button
-    var existingButton = document.querySelector('#sidebarContent .btn-group-vertical');
-    if (existingButton && existingButton.querySelector('a[href*="afterschools.olc.tw"]')) {
-      existingButton.remove();
-    }
-    
-    // Add details button after accordion
-    var detailsButton = '<div class="btn-group-vertical" role="group" style="width: 100%; margin-top: 15px;">';
-    detailsButton += '<a href="https://afterschools.olc.tw/afterschools/view/' + p.code + '" target="_blank" class="btn btn-success btn-lg btn-block">查看詳細資料</a>';
-    detailsButton += '</div>';
-    document.getElementById('accordionMain').insertAdjacentHTML('afterend', detailsButton);
+    // Update details button
+    var detailsLink = document.getElementById('detailsLink');
+    detailsLink.href = 'https://afterschools.olc.tw/afterschools/view/' + p.code;
+    detailsLink.style.display = 'block';
   });
 }
 
@@ -420,6 +413,7 @@ routie({
     // Handle default route - clear selection
     currentFeature = false;
     clusterSource.getSource().refresh();
+    document.getElementById('detailsLink').style.display = 'none';
     sidebar.close();
   },
   ':countyName/:code': function(countyName, code) {
@@ -535,6 +529,7 @@ map.on('singleclick', function (evt) {
     clearSpider();
     currentFeature = false;
     clusterSource.getSource().refresh();
+    document.getElementById('detailsLink').style.display = 'none';
     sidebar.close();
     routie('');
   }
