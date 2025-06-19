@@ -399,6 +399,18 @@ function showFeatureDetails(feature) {
       message += '</tbody></table>';
     }
     slipBox.innerHTML = message;
+    
+    // Remove any existing details button
+    var existingButton = document.querySelector('#sidebarContent .btn-group-vertical');
+    if (existingButton && existingButton.querySelector('a[href*="afterschools.olc.tw"]')) {
+      existingButton.remove();
+    }
+    
+    // Add details button after accordion
+    var detailsButton = '<div class="btn-group-vertical" role="group" style="width: 100%; margin-top: 15px;">';
+    detailsButton += '<a href="https://afterschools.olc.tw/afterschools/view/' + p.code + '" target="_blank" class="btn btn-success btn-lg btn-block">查看詳細資料</a>';
+    detailsButton += '</div>';
+    document.getElementById('accordionMain').insertAdjacentHTML('afterend', detailsButton);
   });
 }
 
