@@ -11,7 +11,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
     <link rel="stylesheet" href="css/ol.css" type="text/css">
-    <link rel="stylesheet" href="css/ol3-sidebar.min.css" type="text/css" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/css/bootstrap.min.css" rel="stylesheet"
         integrity="sha384-wEmeIV1mKuiNpC+IOBjI7aAzPcEZeedi5yW5f2yOq55WWLwNGmvvx4Um1vskeMj0" crossorigin="anonymous">
     <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
@@ -84,25 +83,20 @@
             fjs.parentNode.insertBefore(js, fjs);
         }(document, 'script', 'facebook-jssdk'));
     </script>
-    <div id="sidebar" class="sidebar collapsed">
-        <!-- Nav tabs -->
-        <div class="sidebar-tabs">
-            <ul role="tablist">
-                <li><a href="#home" role="tab"><i class="fa fa-bars"></i></a></li>
-                <li><a href="#book" role="tab"><i class="fa fa-book"></i></a></li>
-                <li><a href="#settings" role="tab"><i class="fa fa-gear"></i></a></li>
-                <li><a href="https://github.com/kiang/afterschools" role="tab" target="_blank"><i
-                            class="fa fa-github"></i></a></li>
-                <li><a href="#fb" role="tab"><i class="fa fa-facebook"></i></a></li>
-            </ul>
-        </div>
+    <!-- Filter Button -->
+    <button id="filterBtn" class="btn btn-primary" style="position: fixed; top: 20px; right: 20px; z-index: 1000; border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;">
+        <i class="fa fa-filter"></i>
+    </button>
 
-        <!-- Tab panes -->
-        <div class="sidebar-content">
-            <div class="sidebar-pane" id="home">
-                <h1 class="sidebar-header"><span id="sidebarTitle">請點選地圖中的點</span><span class="sidebar-close"><i
-                            class="fa fa-caret-left"></i></span></h1>
-                <div id="sidebarContent">
+    <!-- Content Popup Modal -->
+    <div class="modal fade" id="contentModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">請點選地圖中的點</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
                     <div class="accordion" id="accordionMain">
                         <div class="accordion-item">
                             <h2 class="accordion-header" id="heading1">
@@ -129,47 +123,55 @@
                             </div>
                         </div>
                     </div>
-                </div>
-                <div class="btn-group-vertical" role="group" style="width: 100%; margin-top: 15px;">
-                    <a href="#" id="detailsLink" target="_blank" class="btn btn-success btn-lg btn-block" style="display: none;">查看詳細資料</a>
-                </div>
-            </div>
-            <div class="sidebar-pane" id="book">
-                <h1 class="sidebar-header"><span id="weekTitle">說明</span><span class="sidebar-close"><i
-                            class="fa fa-caret-left"></i></span></h1>
-                <div>
-                    注意事項：
-                    <ul>
-                        <li><a href="https://bsb.kh.edu.tw/" target="_blank">資料來源</a></li>
-                    </ul>
-                </div>
-            </div>
-            <div class="sidebar-pane" id="settings">
-                <h1 class="sidebar-header"><span id="weekTitle">設定</span><span class="sidebar-close"><i
-                            class="fa fa-caret-left"></i></span></h1>
-                <div>
-                    <a href="#" class="btn btn-primary btn-lg btn-block" id="btn-geolocation">回到目前位置</a>
-                </div>
-                <hr />
-                <div class="input-group mb-3">
-                    <input type="text" id="feature-search" class="form-control" placeholder="搜尋補習班...">
-                    <div class="input-group-append">
-                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    <div class="btn-group-vertical" role="group" style="width: 100%; margin-top: 15px;">
+                        <a href="#" id="detailsLink" target="_blank" class="btn btn-success btn-lg btn-block" style="display: none;">查看詳細資料</a>
                     </div>
-                </div>
-            </div>
-            <div class="sidebar-pane" id="fb">
-                <div class="fb-page" data-href="https://www.facebook.com/k.olc.tw/" data-tabs="timeline"
-                    data-width="380" data-small-header="false" data-adapt-container-width="true" data-hide-cover="false"
-                    data-show-facepile="true">
-                    <blockquote cite="https://www.facebook.com/k.olc.tw/" class="fb-xfbml-parse-ignore"><a
-                            href="https://www.facebook.com/k.olc.tw/">江明宗</a></blockquote>
                 </div>
             </div>
         </div>
     </div>
 
-    <div id="map" class="sidebar-map"></div>
+    <!-- Filter Popup Modal -->
+    <div class="modal fade" id="filterModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">篩選設定</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <a href="#" class="btn btn-primary btn-lg btn-block" id="btn-geolocation">回到目前位置</a>
+                    </div>
+                    <hr />
+                    <div class="input-group mb-3">
+                        <input type="text" id="feature-search" class="form-control" placeholder="搜尋補習班...">
+                        <div class="input-group-append">
+                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        </div>
+                    </div>
+                    <hr />
+                    <div>
+                        <h6>說明</h6>
+                        注意事項：
+                        <ul>
+                            <li><a href="https://bsb.kh.edu.tw/" target="_blank">資料來源</a></li>
+                        </ul>
+                    </div>
+                    <div class="mt-3">
+                        <div class="fb-page" data-href="https://www.facebook.com/k.olc.tw/" data-tabs="timeline"
+                            data-width="100%" data-small-header="false" data-adapt-container-width="true" data-hide-cover="false"
+                            data-show-facepile="true">
+                            <blockquote cite="https://www.facebook.com/k.olc.tw/" class="fb-xfbml-parse-ignore"><a
+                                href="https://www.facebook.com/k.olc.tw/">江明宗</a></blockquote>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="map" style="width: 100%; height: 100vh;"></div>
     <div style="position: fixed; bottom: 0px; left: 0px;">
         <a href="https://facebook.com/k.olc.tw/" target="_blank" class="btn btn-lg alert-primary">北中西區台南市議員參選人江明宗 製作</a>
     </div>

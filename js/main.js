@@ -1,4 +1,4 @@
-var sidebar = new ol.control.Sidebar({ element: 'sidebar', position: 'right' });
+// Remove sidebar initialization
 var jsonFiles, filesLength, fileKey = 0;
 
 var projection = ol.proj.get('EPSG:3857');
@@ -77,9 +77,11 @@ function pointStyle(f) {
 
   return new ol.style.Style(style);
 }
-var sidebarTitle = document.getElementById('sidebarTitle');
+var modalTitle = document.getElementById('modalTitle');
 var content = document.getElementById('infoBox');
 var slipBox = document.getElementById('slipBox');
+var contentModal = new bootstrap.Modal(document.getElementById('contentModal'));
+var filterModal = new bootstrap.Modal(document.getElementById('filterModal'));
 
 var appView = new ol.View({
   center: ol.proj.fromLonLat([120.721507, 23.700694]),
@@ -213,7 +215,7 @@ map.once('prerender', function() {
   }
 });
 
-map.addControl(sidebar);
+// Remove sidebar control
 var pointClicked = false;
 var selectedCounty = '';
 var pointsPool = {};
@@ -304,6 +306,7 @@ function setupSearch() {
       // When user selects an item, navigate to that feature
       if (ui.item.county && ui.item.code) {
         routie(ui.item.county + '/' + ui.item.code);
+        filterModal.hide();
       }
     }
   }).autocomplete('instance')._renderItem = function(ul, item) {
@@ -387,9 +390,9 @@ function showFeatureDetails(feature) {
     message += '<tr><th scope="row">英文地址</th><td>' + c.英文地址 + '</td></tr>';
     message += '<tr><th scope="row">補習班類別/科目</th><td>' + c["補習班類別/科目"] + '</td></tr>';
     message += '</tbody></table>';
-    sidebarTitle.innerHTML = p.name;
+    modalTitle.innerHTML = p.name;
     content.innerHTML = message;
-    sidebar.open('home');
+    contentModal.show();
     message = '';
     for(k in c.核准科目) {
       message += '<table class="table table-dark"><tbody>';
@@ -414,7 +417,7 @@ routie({
     currentFeature = false;
     clusterSource.getSource().refresh();
     document.getElementById('detailsLink').style.display = 'none';
-    sidebar.close();
+    contentModal.hide();
   },
   ':countyName/:code': function(countyName, code) {
     // Handle feature route
@@ -501,7 +504,7 @@ map.on('singleclick', function (evt) {
         } else {
           // Cluster of features
           clearSpider();
-          sidebar.close();
+          contentModal.hide();
           
           // Get cluster center and current zoom
           var center = feature.getGeometry().getCoordinates();
@@ -530,8 +533,8 @@ map.on('singleclick', function (evt) {
     currentFeature = false;
     clusterSource.getSource().refresh();
     document.getElementById('detailsLink').style.display = 'none';
-    sidebar.close();
-    routie('');
+    contentModal.hide();
+    // Don't change route when just closing popup - keep the marker hash
   }
 });
 
@@ -599,4 +602,18 @@ $('#btn-geolocation').click(function () {
 map.getView().on('change:resolution', function() {
   clearSpider();
   clusterSource.getSource().refresh();
+});
+
+// Filter button event handler
+document.getElementById('filterBtn').addEventListener('click', function() {
+  filterModal.show();
+});
+
+// Prevent URL hash changes when modals are closed manually
+document.getElementById('contentModal').addEventListener('hide.bs.modal', function() {
+  // Don't change the URL hash when closing the content modal
+});
+
+document.getElementById('filterModal').addEventListener('hide.bs.modal', function() {
+  // Don't change the URL hash when closing the filter modal
 });
